@@ -6,3 +6,7 @@
 
 ## To do
 - Restructure the OFDM generation to better reflect the reource actual grid.
+- MIB and other PBCH channels
+- Create a DCI field and send it on PDCCH 
+- LDPC on the PDSCH 
+- Make a decoder. 
