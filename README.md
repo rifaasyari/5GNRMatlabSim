@@ -1,8 +1,12 @@
 # 5GNRMatlabSim
 
-This repo is meant to be a simuilator for the physical layer of 5G NR.
-
-I am starting this by reusing some old LTE code. I'll slowly work on reporpose it to match the current Rel 15 plans from 3GPP including the new BWs and subcarrier spacings. At first, this will just be a waveform generator. I'll eventually try to create a resource mapper and different physcial channels to fill the resource blocks properly.
+## Features
+- Create an OFDM waveform with the proper frame structure for NR including flexible subcarrier spacings
+- Includes PSS
 
 ## To do
-- Everything 
+- Restructure the OFDM generation to better reflect the reource actual grid.
+- MIB and other PBCH channels
+- Create a DCI field and send it on PDCCH 
+- LDPC on the PDSCH 
+- Make a decoder. 
