@@ -11,7 +11,7 @@ classdef NR
    % The channel coding scheme for transport blocks is quasi-cyclic LDPC codes with 2 base graphs and 8 sets of parity check matrices for each base graph, respectively.
    % The channel coding scheme for PBCH and control information is Polar coding based on nested sequences
    %
-   % mu is the 3GPP parameter for subcarrier spacing etc
+   % numerologyMu is the 3GPP parameter for subcarrier spacing etc
    % nRB can be between 24 and 275 for \mu = 0-3. for \mu = 4 the max is
    % 138 RBs and for \mu = 5 the max is 69. See:
    % < 38.211-Table 4.4.2-1: Minimum and maximum number of resource blocks.>
@@ -26,7 +26,7 @@ classdef NR
    end
    
    properties
-      mu
+      numerologyMu
       nRB
       BW % Bandwidth in MHz
       MCS
@@ -46,14 +46,14 @@ classdef NR
    end
    
    methods
-      function obj = NR(mu, nRB, MCS)
+      function obj = NR(numerologyMu, nRB, MCS)
          if nargin == 0
-            mu = 0;
+            numerologyMu = 0;
             nRB = 100;
             MCS = 20;
          end
          
-         obj = constructFrameStructure(obj, mu, nRB);
+         obj = constructFrameStructure(obj, numerologyMu, nRB);
          obj = deconstructMCS(obj, MCS);
          
          obj.nFrames = 1;
@@ -62,14 +62,14 @@ classdef NR
          
       end
       
-      function obj = constructFrameStructure(obj,mu, nRB)
-         obj.mu = mu;
+      function obj = constructFrameStructure(obj,numerologyMu, nRB)
+         obj.numerologyMu = numerologyMu;
          obj.nRB = nRB;
-         obj.subcarrierSpacing = 2^mu * 15;
-         obj.slotsPerFrame = 2^mu *10;
-         obj.slotsPerSubframe = 2^mu;
+         obj.subcarrierSpacing = 2^numerologyMu * 15;
+         obj.slotsPerFrame = 2^numerologyMu *10;
+         obj.slotsPerSubframe = 2^numerologyMu;
          obj.nSymbols = obj.slotsPerFrame * obj.SYMBOLS_PER_SLOT
-         if mu == 2
+         if numerologyMu == 2
             obj.cyclicPrefixType = 'Extended';
          else
             obj.cyclicPrefixType = 'Normal';
@@ -127,7 +127,7 @@ classdef NR
       end
       
       function obj = signalGenerator(obj)
-         nBits = 50*obj.modulationOrder;
+         nBits = 1*obj.modulationOrder;
          rawBits = randi([0 1],1,nBits);
          preModulation = reshape(rawBits,...
             [obj.modulationOrder,nBits/obj.modulationOrder])';
@@ -135,9 +135,33 @@ classdef NR
          %I'd prefer to change this to be actual resource elements and only
          %the number that there are. Then we'll flip things around for the
          %IFFT and zero pad. It'd make more sence and be easier to find
-         %things. 
+         %things.
          resourceElementGrid = zeros(obj.fftSize, obj.nSymbols);
          resourceElementGrid = generatePSS(obj,resourceElementGrid);
+         
+         %Fill the resource elements with the data in the queue
+         
+         %Fill first symbol.
+         for j = 1:obj.nSymbols
+            for i = 1:obj.nSubCarrires/2
+               if resourceElementGrid(i+1,j) == 0
+                  if isempty(symbolsToTransmit)
+                     break;
+                  end
+                  resourceElementGrid(i+1,j) = symbolsToTransmit(1);
+                  symbolsToTransmit = symbolsToTransmit(2:end);
+                  if isempty(symbolsToTransmit)
+                     break;
+                  end
+                  resourceElementGrid(end-i+1,j) = symbolsToTransmit(1);
+                  symbolsToTransmit = symbolsToTransmit(2:end);
+                  if isempty(symbolsToTransmit)
+                     break;
+                  end
+               end
+            end
+         end
+         
          resourceGrid = reshape(symbolsToTransmit,obj.nSubCarrires,[]);
          %resourceElementGrid(2:2+obj.nSubCarrires/2-1,:) = resourceGrid(1:obj.nSubCarrires/2,:);
          %resourceElementGrid(end - obj.nSubCarrires/2+1:end,:) = resourceGrid(obj.nSubCarrires/2+1:obj.nSubCarrires,:);
@@ -150,22 +174,23 @@ classdef NR
          ofdmData = insertCyclicPrefix(obj,ofdmData);
          obj.signal = ofdmData(:);
          
-         plotPSD(obj,obj.signal);
-         obj.PAPR = calculatePAPR(obj,obj.signal);
+         spectrogram(obj.signal,kaiser(256,5),220,512,obj.samplingRate*10^6,'centered')
+         %plotPSD(obj,obj.signal);
+         %obj.PAPR = calculatePAPR(obj,obj.signal);
          %Maybe should put a CCDF plot
-         ccdf = comm.CCDF('PAPROutputPort',true,'MaximumPowerLimit', 50);
-         ccdf(obj.signal);
-         figure
-         plot(ccdf)
+         %ccdf = comm.CCDF('PAPROutputPort',true,'MaximumPowerLimit', 50);
+         %ccdf(obj.signal);
+         %figure
+         %plot(ccdf)
       end
       
       function out = insertCyclicPrefix(obj,signal)
          switch obj.cyclicPrefixType
             case 'Extended'
-               nCyclicSamples = 512 * 2^-obj.mu;
+               nCyclicSamples = 512 * 2^-obj.numerologyMu;
                out = [signal; signal(end-nCyclicSamples-1:end,:)];
             case 'Normal'
-               nCyclicSamples = 144 * 2^-obj.mu;
+               nCyclicSamples = 144 * 2^-obj.numerologyMu;
                out = [signal; signal(end-nCyclicSamples-1:end,:)];
          end
       end
